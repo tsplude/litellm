@@ -140,7 +140,8 @@ class BaseModelResponseIterator:
                 if index != -1:
                     str_line = str_line[index:]
             # chunk is a str at this point
-            return self._handle_string_chunk(str_line=str_line)
+            result = self._handle_string_chunk(str_line=str_line)
+            return result
         except StopIteration:
             raise StopIteration
         except ValueError as e:

@@ -258,7 +258,7 @@ class OpenRouterChatCompletionStreamingHandler(BaseModelResponseIterator):
             for choice in chunk["choices"]:
                 choice["delta"]["reasoning_content"] = choice["delta"].get("reasoning")
                 new_choices.append(choice)
-            return ModelResponseStream(
+            result = ModelResponseStream(
                 id=chunk["id"],
                 object="chat.completion.chunk",
                 created=chunk["created"],
@@ -266,6 +266,7 @@ class OpenRouterChatCompletionStreamingHandler(BaseModelResponseIterator):
                 model=chunk["model"],
                 choices=new_choices,
             )
+            return result
         except KeyError as e:
             raise OpenRouterException(
                 message=f"KeyError: {e}, Got unexpected response from OpenRouter: {chunk}",

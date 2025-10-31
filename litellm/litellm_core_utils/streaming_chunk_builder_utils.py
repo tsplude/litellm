@@ -395,7 +395,7 @@ class ChunkProcessor:
         web_search_requests: Optional[int] = None
         completion_tokens_details: Optional[CompletionTokensDetails] = None
         prompt_tokens_details: Optional[PromptTokensDetailsWrapper] = None
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
             usage_chunk: Optional[Usage] = None
             if "usage" in chunk:
                 usage_chunk = chunk["usage"]

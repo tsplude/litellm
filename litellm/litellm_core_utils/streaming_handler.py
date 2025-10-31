@@ -607,6 +607,16 @@ class CustomStreamWrapper:
         except Exception as e:
             raise e
 
+    def _has_received_usage_chunk(self) -> bool:
+        """
+        Check if we've received a chunk with usage data.
+        Used to determine if we should wait for usage when stream_options.include_usage=True.
+        """
+        for chunk in self.chunks:
+            if hasattr(chunk, "usage") and chunk.usage is not None:
+                return True
+        return False
+
     def model_response_creator(
         self, chunk: Optional[dict] = None, hidden_params: Optional[dict] = None
     ):
@@ -948,6 +958,16 @@ class CustomStreamWrapper:
                 # Default - return StopIteration
                 if hasattr(model_response, "usage"):
                     self.chunks.append(model_response)
+
+                # OpenRouter-specific: Don't raise StopIteration if waiting for usage chunk
+                # OpenRouter sends usage in a separate chunk after finish_reason when stream_options.include_usage=True
+                if (
+                    self.custom_llm_provider == "openrouter"
+                    and self.send_stream_usage
+                    and not self._has_received_usage_chunk()
+                ):
+                    return None  # Continue to next chunk
+
                 raise StopIteration
             # flush any remaining holding chunk
             if len(self.holding_chunk) > 0:
@@ -1046,6 +1066,14 @@ class CustomStreamWrapper:
             ):
                 if self.received_finish_reason is not None:
                     if "provider_specific_fields" not in chunk:
+                        # OpenRouter-specific: Don't raise StopIteration if waiting for usage chunk
+                        # OpenRouter sends usage in a separate chunk after finish_reason when stream_options.include_usage=True
+                        if (
+                            self.custom_llm_provider == "openrouter"
+                            and self.send_stream_usage
+                            and not self._has_received_usage_chunk()
+                        ):
+                            return None
                         raise StopIteration
                 anthropic_response_obj: GChunk = cast(GChunk, chunk)
                 completion_obj["content"] = anthropic_response_obj["text"]
