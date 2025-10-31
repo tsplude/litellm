@@ -147,6 +147,7 @@ class CustomStreamWrapper:
         )  # keep track of the returned chunks - used for calculating the input/output tokens for stream options
         self.is_function_call = self.check_is_function_call(logging_obj=logging_obj)
         self.created: Optional[int] = None
+        self.has_received_usage_chunk = False
 
     def __iter__(self):
         return self
@@ -607,16 +608,6 @@ class CustomStreamWrapper:
         except Exception as e:
             raise e
 
-    def _has_received_usage_chunk(self) -> bool:
-        """
-        Check if we've received a chunk with usage data.
-        Used to determine if we should wait for usage when stream_options.include_usage=True.
-        """
-        for chunk in self.chunks:
-            if hasattr(chunk, "usage") and chunk.usage is not None:
-                return True
-        return False
-
     def model_response_creator(
         self, chunk: Optional[dict] = None, hidden_params: Optional[dict] = None
     ):
@@ -958,13 +949,15 @@ class CustomStreamWrapper:
                 # Default - return StopIteration
                 if hasattr(model_response, "usage"):
                     self.chunks.append(model_response)
+                    if model_response.usage is not None:
+                        self.has_received_usage_chunk = True
 
                 # OpenRouter sends usage in a separate chunk after finish_reason when stream_options.include_usage=True
                 # Don't raise StopIteration if waiting for usage chunk
                 if (
                     self.custom_llm_provider == "openrouter"
                     and self.send_stream_usage
-                    and not self._has_received_usage_chunk()
+                    and not self.has_received_usage_chunk
                 ):
                     return None
 
@@ -998,6 +991,8 @@ class CustomStreamWrapper:
         else:
             if hasattr(model_response, "usage"):
                 self.chunks.append(model_response)
+                if model_response.usage is not None:
+                    self.has_received_usage_chunk = True
             return
 
     def _optional_combine_thinking_block_in_choices(
@@ -1071,7 +1066,7 @@ class CustomStreamWrapper:
                         if (
                             self.custom_llm_provider == "openrouter"
                             and self.send_stream_usage
-                            and not self._has_received_usage_chunk()
+                            and not self.has_received_usage_chunk
                         ):
                             return None
                         raise StopIteration
@@ -1703,6 +1698,8 @@ class CustomStreamWrapper:
                     )
                     # HANDLE STREAM OPTIONS
                     self.chunks.append(response)
+                    if hasattr(response, "usage") and response.usage is not None:
+                        self.has_received_usage_chunk = True
                     if hasattr(
                         response, "usage"
                     ):  # remove usage from chunk, only send on final chunk
@@ -1868,6 +1865,8 @@ class CustomStreamWrapper:
                         input=self.response_uptil_now, model=self.model
                     )
                     self.chunks.append(processed_chunk)
+                    if hasattr(processed_chunk, "usage") and processed_chunk.usage is not None:
+                        self.has_received_usage_chunk = True
                     if hasattr(
                         processed_chunk, "usage"
                     ):  # remove usage from chunk, only send on final chunk
@@ -1931,6 +1930,8 @@ class CustomStreamWrapper:
                         )
                         # RETURN RESULT
                         self.chunks.append(processed_chunk)
+                        if hasattr(processed_chunk, "usage") and processed_chunk.usage is not None:
+                            self.has_received_usage_chunk = True
                         return processed_chunk
         except (StopAsyncIteration, StopIteration):
             if self.sent_last_chunk is True:
