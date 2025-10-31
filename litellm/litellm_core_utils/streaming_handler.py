@@ -959,14 +959,14 @@ class CustomStreamWrapper:
                 if hasattr(model_response, "usage"):
                     self.chunks.append(model_response)
 
-                # OpenRouter-specific: Don't raise StopIteration if waiting for usage chunk
                 # OpenRouter sends usage in a separate chunk after finish_reason when stream_options.include_usage=True
+                # Don't raise StopIteration if waiting for usage chunk
                 if (
                     self.custom_llm_provider == "openrouter"
                     and self.send_stream_usage
                     and not self._has_received_usage_chunk()
                 ):
-                    return None  # Continue to next chunk
+                    return None
 
                 raise StopIteration
             # flush any remaining holding chunk
@@ -1066,8 +1066,8 @@ class CustomStreamWrapper:
             ):
                 if self.received_finish_reason is not None:
                     if "provider_specific_fields" not in chunk:
-                        # OpenRouter-specific: Don't raise StopIteration if waiting for usage chunk
                         # OpenRouter sends usage in a separate chunk after finish_reason when stream_options.include_usage=True
+                        # Don't raise StopIteration if waiting for usage chunk
                         if (
                             self.custom_llm_provider == "openrouter"
                             and self.send_stream_usage
